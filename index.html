@@ -750,8 +750,9 @@ let currentRank = '';
 
 const TIMER_SEC = 60;
 const LS_KEY    = 'advbox_quiz_leads';
-const QUIZ_ID   = '0ac71938-c36d-4165-970b-630440d33c2b';
+let QUIZ_ID     = '0ac71938-c36d-4165-970b-630440d33c2b';
 const EDGE_FUNCTION_URL = 'https://nonlpkjdenbmshyugejk.functions.supabase.co/submit-quiz';
+const EVENT_LOOKUP_URL = 'https://nonlpkjdenbmshyugejk.supabase.co/functions/v1/get-event-by-slug';
 
 let currentEventId = null;
 let currentEventName = '';
@@ -768,6 +769,33 @@ const EVENT_CONFIG = {
 function getEventSlugFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return params.get('event') || '';
+}
+
+async function loadEventConfig() {
+  currentEventSlug = getEventSlugFromUrl();
+
+  if (!currentEventSlug) return;
+
+  try {
+    const response = await fetch(`${EVENT_LOOKUP_URL}?event=${encodeURIComponent(currentEventSlug)}`);
+    const data = await response.json();
+
+    if (response.ok) {
+      currentEventId = data.event_id;
+      currentEventName = data.name;
+
+      if (data.quiz_id) {
+        QUIZ_ID = data.quiz_id;
+      }
+    }
+  } catch (error) {
+    console.warn('Não foi possível buscar o evento no Supabase.', error);
+  }
+
+  if (!currentEventId && EVENT_CONFIG[currentEventSlug]) {
+    currentEventId = EVENT_CONFIG[currentEventSlug].id;
+    currentEventName = EVENT_CONFIG[currentEventSlug].name;
+  }
 }
 
 
@@ -1213,15 +1241,11 @@ function exportCSV() {
 }
 
 // ── INIT ──────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   initLogos();
+  await loadEventConfig();
 
-  currentEventSlug = getEventSlugFromUrl();
-
-  if (currentEventSlug && EVENT_CONFIG[currentEventSlug]) {
-    currentEventId = EVENT_CONFIG[currentEventSlug].id;
-    currentEventName = EVENT_CONFIG[currentEventSlug].name;
-
+  if (currentEventName) {
     document.getElementById('event-name').textContent = currentEventName.toUpperCase();
   }
 });
